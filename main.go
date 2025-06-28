@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"log"
 	"os"
+	"time"
 	"image"
 	"fmt"
 	"strconv"
@@ -15,7 +16,97 @@ import (
 )
 
 func main(){
-	numWorkers := runtime.NumCPU()
+	measureExecutionTime("goroutine不使用",func(){ngoroutine()})
+	measureExecutionTime("goroutine使用",func(){goroutine()})
+}
+
+
+
+
+func GetInput () string { 
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatal(err)
+	}
+	return input
+}
+
+func measureExecutionTime(name string, fn func()) {
+	if name == "ダミー"{
+		fn()
+		return
+	}
+	start := time.Now()//計測開始
+	defer func() {
+		fmt.Printf("%s にかかった時間: %s\n", name, time.Since(start))
+	}()
+	fn()
+}
+
+func ngoroutine(){
+	// createpath,imagepath,sizeを取得
+	fmt.Print("input create of image directory: ")
+	input := GetInput()
+	createpath := strings.TrimSpace(input)
+
+	fmt.Print("input path of image directory: ")
+	input = GetInput()
+	imagepath := strings.TrimSpace(input)
+
+	fmt.Print("input size: ")
+	input = GetInput()
+	input = strings.TrimSpace(input)
+	strsize := strings.Fields(input)
+	var intsize []int
+	for _,s:= range strsize{
+		size, _ := strconv.Atoi(s)
+		intsize = append(intsize,size)
+	}
+
+	pngFiles, err1 := filepath.Glob(imagepath+"/*.png")
+	jpegFiles, err2 := filepath.Glob(imagepath+"/*.jpeg")
+	jpgFiles, err3 := filepath.Glob(imagepath+"/*.jpg")
+
+	var allFiles []string
+	allFiles = append(pngFiles, jpegFiles...)
+	allFiles = append(allFiles, jpgFiles...)
+	if err1!=nil || err2!=nil || err3!=nil || allFiles==nil{
+		panic(fmt.Errorf("読み込めませんでした。\nerr1: %v\nerr2: %v\n読み込んだファイル: %v",err1,err2,allFiles))
+	}
+
+
+	type ImageInfo struct{
+		imagepath string
+		image image.Image
+	}
+
+	var imgdata,resizedimgdata []ImageInfo
+	
+	// imageのloading
+	for _,fp:= range allFiles{
+		img,err := conimg.LoadImage(fp)
+		if err!=nil{
+			panic(err)
+		}
+		imgdata = append(imgdata,ImageInfo{imagepath: fp,image: img})
+	}
+
+	for _,img:= range imgdata{
+		img.image = conimg.ResizeControl(img.image,intsize)
+		resizedimgdata = append(resizedimgdata,img)
+	}
+
+	for _,resizedimg:= range resizedimgdata{
+		err := conimg.SaveImage(createpath,resizedimg.imagepath,resizedimg.image)
+		if err!=nil{
+			panic(err)
+		}
+	}
+}
+
+func goroutine(){
+		numWorkers := runtime.NumCPU()
 
 	// createpath,imagepath,sizeを取得
 	fmt.Print("input create of image directory: ")
@@ -38,16 +129,12 @@ func main(){
 
 	pngFiles, err1 := filepath.Glob(imagepath+"/*.png")
 	jpegFiles, err2 := filepath.Glob(imagepath+"/*.jpeg")
+	jpgFiles, err3 := filepath.Glob(imagepath+"/*.jpg")
 
 	var allFiles []string
-	if err1==nil && err2==nil{
-		allFiles = append(pngFiles, jpegFiles...)
-	} else if err1==nil && err2!=nil{
-		allFiles = pngFiles
-	} else if err1!=nil && err2==nil{
-		allFiles = jpegFiles
-	}
-	if (err1!=nil && err2!=nil) || allFiles==nil{
+	allFiles = append(pngFiles, jpegFiles...)
+	allFiles = append(allFiles, jpgFiles...)
+	if err1!=nil || err2!=nil || err3!=nil || allFiles==nil{
 		panic(fmt.Errorf("読み込めませんでした。\nerr1: %v\nerr2: %v\n読み込んだファイル: %v",err1,err2,allFiles))
 	}
 
@@ -123,16 +210,4 @@ func main(){
 		}()
 	}
 	wg3.Wait()
-}
-
-
-
-
-func GetInput () string { 
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		log.Fatal(err)
-	}
-	return input
 }
